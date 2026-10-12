@@ -164,6 +164,11 @@ pipeline {
                 '''
             }
         }
+        stage('Show Commit Details') {
+            steps {
+                bat 'git log -1 --format="Commit: %%h%%nAuthor: %%an%%nEmail: %%ae%%nMessage: %%s"'
+            }
+        }
     }
 
     post {
