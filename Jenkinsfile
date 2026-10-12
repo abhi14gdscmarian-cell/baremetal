@@ -177,7 +177,7 @@ pipeline {
         }
 
         failure {
-            echo 'FAILURE: Review the first failing stage in Console Output.'
+            echo 'FAILURE: Review the first failing stage in Console Output12.'
         }
 
         always {
