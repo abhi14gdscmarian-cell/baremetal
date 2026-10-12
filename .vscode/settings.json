@@ -1,0 +1,10 @@
+{
+    "cmake.sourceDirectory": "${workspaceFolder}",
+    "cmake.generator": "Ninja",
+    "cmake.buildDirectory": "${workspaceFolder}/build",
+    "cmake.configureSettings": {
+        "CMAKE_TOOLCHAIN_FILE": "${workspaceFolder}/riscv64-unknown-elf-toolchain.cmake",
+        "MPFS_PYTHON_EXECUTABLE": "C:/Microchip/SoftConsole-v2022.2-RISC-V-747/python3/python.exe"
+    },
+    "cmake.configureOnOpen": true
+}

@@ -1,0 +1,37 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build PolarFire SoC firmware",
+            "type": "process",
+            "command": "cmake",
+            "args": ["--build", "${workspaceFolder}/build"],
+            "options": { "cwd": "${workspaceFolder}" },
+            "group": { "kind": "build", "isDefault": true },
+            "problemMatcher": []
+        },
+        {
+            "label": "Start Renode Icicle Kit platform",
+            "type": "process",
+            "command": "C:/Microchip/SoftConsole-v2022.2-RISC-V-747/renode/bin/Renode.exe",
+            "args": [
+                "--console",
+                "--execute",
+                "$GDB_SERVER_PORT=3333; include @C:/Microchip/SoftConsole-v2022.2-RISC-V-747/renode-microchip-mods/scripts/polarfire-soc-icicle-board.resc"
+            ],
+            "options": { "cwd": "${workspaceFolder}" },
+            "dependsOn": "Build PolarFire SoC firmware",
+            "dependsOrder": "sequence",
+            "isBackground": true,
+            "problemMatcher": {
+                "owner": "renode",
+                "pattern": [{ "regexp": ".*" }],
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": ".*",
+                    "endsPattern": "Renode has been started successfully and is ready for a gdb connection"
+                }
+            }
+        }
+    ]
+}

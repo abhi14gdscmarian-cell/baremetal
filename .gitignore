@@ -1,0 +1,8 @@
+/.settings*/
+/src/boards/*/fpga_design_config/**
+/*-Debug/
+/*-Release/
+/build/
+
+/build-tests/
+/build-coverage/

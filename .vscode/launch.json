@@ -1,0 +1,74 @@
+ {
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "1. Clean Only",
+            "type": "node-terminal",
+            "request": "launch",
+
+            "command": "cmake -E remove_directory build",
+
+            
+        },
+        {
+            "name": "2. Build Only",
+            "type": "node-terminal",
+            "request": "launch",
+
+            "command": "cmake --build build",
+
+            
+        },
+        {
+            "name": "3. Configure Only",
+            "type": "node-terminal",
+            "request": "launch",
+
+            "command": "cmake -S . -B build -G \"MinGW Makefiles\"",
+
+            
+        },
+        {
+            "name": "4. Configure Test Only",
+            "type": "node-terminal",
+            "request": "launch",
+
+            "command": "cmake -S . -B build-tests -G \"MinGW Makefiles\" -DBUILD_GTEST=ON",
+
+        },
+        {
+            "name": "5. Build TEST Only",
+            "type": "node-terminal",
+            "request": "launch",
+
+            "command": "cmake --build build-tests -- -j",
+
+            
+        },
+        {
+            "name": "6. Run TEST Only",
+            "type": "node-terminal",
+            "request": "launch",
+
+            "command": ".\\build-tests\\src\\tests\\unit_tests.exe",
+
+            
+        },
+        {
+            "name": "7. Generate Coverage Report Only",
+            "type": "node-terminal",
+            "request": "launch",
+
+            "command": "C:/msys64/usr/bin/bash.exe -c 'export PATH=/usr/bin:/ucrt64/bin:/bin:$PATH; bash ../run.sh'",
+            "cwd": "${workspaceFolder}/build-tests"
+
+            
+        },
+
+    ]
+}
+
+C:\Users\User\Desktop\Polar\polarfire-soc-bare-metal-examples\applications\mpfs-blank-baremetal\.settings
+
+
+
