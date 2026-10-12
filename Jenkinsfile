@@ -177,11 +177,11 @@ pipeline {
         }
 
         failure {
-            echo 'FAILURE: Review the first failing stage in Console Output.'
+            echo 'FAILURE: Review the first failing stage in Console Output12.'
         }
 
         always {
-            echo 'MPFS bare-metal CI pipeline finished12.'
+            echo 'MPFS bare-metal CI pipeline finished.'
         }
     }
 }
