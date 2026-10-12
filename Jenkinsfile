@@ -31,7 +31,7 @@ pipeline {
                 checkout scm
 
                 echo 'Source code checked out successfully.'
-                bat 'git log -1 --oneline'
+                bat 'git log -1 --pretty=format:"Commit Hash: %%H%%nAuthor: %%an%%nEmail: %%ae%%nDate: %%ad%%nMessage: %%s"'
             }
         }
 
