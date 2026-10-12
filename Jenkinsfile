@@ -181,7 +181,7 @@ pipeline {
         }
 
         always {
-            echo 'MPFS bare-metal CI pipeline finished.'
+            echo 'MPFS bare-metal CI pipeline finished Completely1.'
         }
     }
 }
