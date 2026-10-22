@@ -35,7 +35,7 @@ This example can be run on the Renode emulation platform. Build the application 
 
 UART console display and logging options can be found under the Startup tab in `Debug Configurations` > `mpfs-blank-baremetal renode all-harts debug`. More information about using Renode is available at https://renode.readthedocs.io
 
-### DDR training and Renode
+### DDR training and Renodes
 If the firmware has DDR training enabled, then the application will take significantly longer to start up in Renode. Training has no practical impact in this environment as the emulated DDR memory is already reliable.
 
 Training can be controlled by removing `#define DDR_SUPPORT` in your `mss_sw_config.h` file. This change should be made in `src\boards\[BOARD]\platform_config\[BUILD-CONFIGURATION]\mpfs_hal_config\`
