@@ -19,7 +19,7 @@ pipeline {
     environment {
         // Update this path if SoftConsole is installed elsewhere.
         RISCV_BIN = 'C:\\Microchip\\SoftConsole-v2022.2-RISC-V-747\\riscv-unknown-elf-gcc\\bin'
-
+        FIRMWARE_ELF = 'build-ci-firmware\\mpfs-blank-baremetal.elf'
         FIRMWARE_BUILD_DIR = 'build-ci-firmware'
         TEST_BUILD_DIR = 'build-ci-tests'
         TOOLCHAIN_FILE = 'riscv64-unknown-elf-toolchain.cmake'
@@ -164,6 +164,116 @@ pipeline {
                 '''
             }
         }
+        
+stage('Flash Firmware to RAM') {
+    steps {
+        powershell '''
+            $ErrorActionPreference = 'Stop'
+
+            $elf = Join-Path $env:WORKSPACE `
+                'build-ci-firmware\\mpfs-blank-baremetal.elf'
+
+            $openocd = Join-Path $env:OPENOCD_BIN 'openocd.exe'
+            $gdb = Join-Path $env:RISCV_BIN `
+                'riscv64-unknown-elf-gdb.exe'
+
+            $scripts = $env:OPENOCD_SCRIPTS
+            $log = Join-Path $env:WORKSPACE 'openocd.log'
+            $err = Join-Path $env:WORKSPACE 'openocd-error.log'
+
+            # Verify the required files first.
+            foreach ($file in @($elf, $openocd, $gdb)) {
+                if (!(Test-Path $file)) {
+                    throw "Required file not found: $file"
+                }
+            }
+
+            if (!(Test-Path $scripts)) {
+                throw "OpenOCD scripts directory not found: $scripts"
+            }
+
+            Write-Host "Firmware: $elf"
+            Write-Host "Checking programmer and target..."
+
+            Remove-Item $log, $err -Force `
+                -ErrorAction SilentlyContinue
+
+            # Use only the board configuration appropriate for
+            # the actual target and installed SoftConsole version.
+            $config = Join-Path $scripts 'board\\microsemi-riscv.cfg'
+
+            if (!(Test-Path $config)) {
+                throw "Board configuration not found: $config"
+            }
+
+            $proc = Start-Process `
+                -FilePath $openocd `
+                -ArgumentList @(
+                    '-s', $scripts,
+                    '-f', 'board/microsemi-riscv.cfg'
+                ) `
+                -RedirectStandardOutput $log `
+                -RedirectStandardError $err `
+                -PassThru
+
+            try {
+                $deadline = (Get-Date).AddSeconds(20)
+                $connected = $false
+
+                while ((Get-Date) -lt $deadline) {
+                    Start-Sleep -Milliseconds 500
+
+                    $output = ''
+                    if (Test-Path $log) {
+                        $output += Get-Content $log -Raw `
+                            -ErrorAction SilentlyContinue
+                    }
+                    if (Test-Path $err) {
+                        $output += Get-Content $err -Raw `
+                            -ErrorAction SilentlyContinue
+                    }
+
+                    if ($proc.HasExited) {
+                        throw "OpenOCD exited. Review its logs."
+                    }
+
+                    if ($output -match 'Examined RISCV core') {
+                        $connected = $true
+                        break
+                    }
+                }
+
+                if (!$connected) {
+                    throw "Target not detected within 20 seconds. Check FlashPro4, JTAG, power, and OpenOCD logs."
+                }
+
+                Write-Host "Target detected. Downloading firmware..."
+
+                & $gdb $elf --batch `
+                    -ex 'set architecture riscv:rv32' `
+                    -ex 'target extended-remote localhost:3333' `
+                    -ex 'monitor reset halt' `
+                    -ex 'load' `
+                    -ex 'monitor resume' `
+                    -ex 'detach' `
+                    -ex 'quit'
+
+                if ($LASTEXITCODE -ne 0) {
+                    throw "GDB download failed with exit code $LASTEXITCODE"
+                }
+
+                Write-Host "SUCCESS: Firmware downloaded and execution resumed."
+            }
+            finally {
+                if (!$proc.HasExited) {
+                    Stop-Process -Id $proc.Id -Force
+                }
+            }
+        '''
+        }
+    }
+
+        
         stage('Show Commit Details') {
             steps {
                 bat 'git log -1 --format="Commit: %%h%%nAuthor: %%an%%nEmail: %%ae%%nMessage: %%s"'
