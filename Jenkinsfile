@@ -17,12 +17,13 @@ pipeline {
     }
 
     environment {
-        // Update this path if SoftConsole is installed elsewhere.
-        RISCV_BIN = 'C:\\Microchip\\SoftConsole-v2022.2-RISC-V-747\\riscv-unknown-elf-gcc\\bin'
-        FIRMWARE_ELF = 'build-ci-firmware\\mpfs-blank-baremetal.elf'
-        FIRMWARE_BUILD_DIR = 'build-ci-firmware'
-        TEST_BUILD_DIR = 'build-ci-tests'
-        TOOLCHAIN_FILE = 'riscv64-unknown-elf-toolchain.cmake'
+    RISCV_BIN = 'C:\\Microchip\\SoftConsole-v2022.2-RISC-V-747\\riscv-unknown-elf-gcc\\bin'
+    OPENOCD_BIN = 'C:\\Microchip\\SoftConsole-v2022.2-RISC-V-747\\openocd\\bin'
+    OPENOCD_SCRIPTS = 'C:\\Microchip\\SoftConsole-v2022.2-RISC-V-747\\openocd\\share\\openocd\\scripts'
+    FIRMWARE_ELF = 'build-ci-firmware\\mpfs-blank-baremetal.elf'
+    FIRMWARE_BUILD_DIR = 'build-ci-firmware'
+    TEST_BUILD_DIR = 'build-ci-tests'
+    TOOLCHAIN_FILE = 'riscv64-unknown-elf-toolchain.cmake'
     }
 
     stages {
