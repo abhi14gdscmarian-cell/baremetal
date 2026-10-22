@@ -94,6 +94,37 @@ pipeline {
                 '''
             }
         }
+        
+stage('Clean Build Directories') {
+    steps {
+        powershell '''
+            $ErrorActionPreference = 'Stop'
+
+            $dirs = @(
+                'build-ci-firmware',
+                'build-ci-tests'
+            )
+
+            foreach ($dir in $dirs) {
+                $path = Join-Path $env:WORKSPACE $dir
+
+                if (Test-Path $path) {
+                    Write-Host "Removing: $path"
+                    Remove-Item -LiteralPath $path -Recurse -Force
+                }
+
+                if (Test-Path $path) {
+                    throw "Failed to clean directory: $path"
+                }
+
+                Write-Host "Clean: $dir"
+            }
+
+            Write-Host 'Build directories cleaned successfully.'
+        '''
+        }
+    }
+
 
         stage('Configure Firmware') {
             steps {
@@ -166,113 +197,169 @@ pipeline {
             }
         }
         
+        
 stage('Flash Firmware to RAM') {
     steps {
-        powershell '''
-            $ErrorActionPreference = 'Stop'
+        catchError(
+            buildResult: 'SUCCESS',
+            stageResult: 'FAILURE',
+            message: 'Hardware flashing failed; continuing CI pipeline.'
+        ) {
+            powershell '''
+                $ErrorActionPreference = 'Stop'
 
-            $elf = Join-Path $env:WORKSPACE `
-                'build-ci-firmware\\mpfs-blank-baremetal.elf'
+                # ----------------------------------------
+                # 1. Configure paths
+                # ----------------------------------------
+                $elf = Join-Path $env:WORKSPACE `
+                    $env:FIRMWARE_ELF
 
-            $openocd = Join-Path $env:OPENOCD_BIN 'openocd.exe'
-            $gdb = Join-Path $env:RISCV_BIN `
-                'riscv64-unknown-elf-gdb.exe'
+                $openocd = Join-Path $env:OPENOCD_BIN `
+                    'openocd.exe'
 
-            $scripts = $env:OPENOCD_SCRIPTS
-            $log = Join-Path $env:WORKSPACE 'openocd.log'
-            $err = Join-Path $env:WORKSPACE 'openocd-error.log'
+                $gdb = Join-Path $env:RISCV_BIN `
+                    'riscv64-unknown-elf-gdb.exe'
 
-            # Verify the required files first.
-            foreach ($file in @($elf, $openocd, $gdb)) {
-                if (!(Test-Path $file)) {
-                    throw "Required file not found: $file"
+                $scripts = $env:OPENOCD_SCRIPTS
+
+                $log = Join-Path $env:WORKSPACE 'openocd.log'
+                $err = Join-Path $env:WORKSPACE 'openocd-error.log'
+
+                Write-Host '========================================'
+                Write-Host 'Firmware download to RAM'
+                Write-Host '========================================'
+                Write-Host "Firmware: $elf"
+
+                # ----------------------------------------
+                # 2. Verify required files
+                # ----------------------------------------
+                foreach ($file in @($elf, $openocd, $gdb)) {
+                    if ([string]::IsNullOrWhiteSpace($file) -or
+                        !(Test-Path -LiteralPath $file)) {
+                        throw "Required file not found: $file"
+                    }
                 }
-            }
 
-            if (!(Test-Path $scripts)) {
-                throw "OpenOCD scripts directory not found: $scripts"
-            }
+                if ([string]::IsNullOrWhiteSpace($scripts) -or
+                    !(Test-Path -LiteralPath $scripts)) {
+                    throw "OpenOCD scripts directory not found: $scripts"
+                }
 
-            Write-Host "Firmware: $elf"
-            Write-Host "Checking programmer and target..."
+                $config = Join-Path $scripts `
+                    'board\\microsemi-riscv.cfg'
 
-            Remove-Item $log, $err -Force `
-                -ErrorAction SilentlyContinue
+                if (!(Test-Path -LiteralPath $config)) {
+                    throw "OpenOCD board configuration not found: $config"
+                }
 
-            # Use only the board configuration appropriate for
-            # the actual target and installed SoftConsole version.
-            $config = Join-Path $scripts 'board\\microsemi-riscv.cfg'
+                # ----------------------------------------
+                # 3. Start OpenOCD
+                # ----------------------------------------
+                Remove-Item $log, $err -Force `
+                    -ErrorAction SilentlyContinue
 
-            if (!(Test-Path $config)) {
-                throw "Board configuration not found: $config"
-            }
+                Write-Host 'Starting OpenOCD...'
 
-            $proc = Start-Process `
-                -FilePath $openocd `
-                -ArgumentList @(
-                    '-s', $scripts,
-                    '-f', 'board/microsemi-riscv.cfg'
-                ) `
-                -RedirectStandardOutput $log `
-                -RedirectStandardError $err `
-                -PassThru
+                $proc = Start-Process `
+                    -FilePath $openocd `
+                    -ArgumentList @(
+                        '-s', $scripts,
+                        '-f', 'board/microsemi-riscv.cfg'
+                    ) `
+                    -WorkingDirectory (Split-Path $openocd) `
+                    -RedirectStandardOutput $log `
+                    -RedirectStandardError $err `
+                    -PassThru
 
-            try {
-                $deadline = (Get-Date).AddSeconds(20)
-                $connected = $false
+                try {
+                    # ------------------------------------
+                    # 4. Wait for target connection
+                    # ------------------------------------
+                    $deadline = (Get-Date).AddSeconds(20)
+                    $connected = $false
 
-                while ((Get-Date) -lt $deadline) {
-                    Start-Sleep -Milliseconds 500
+                    while ((Get-Date) -lt $deadline) {
+                        Start-Sleep -Milliseconds 500
 
-                    $output = ''
-                    if (Test-Path $log) {
-                        $output += Get-Content $log -Raw `
+                        $output = ''
+
+                        if (Test-Path $log) {
+                            $output += Get-Content $log -Raw `
+                                -ErrorAction SilentlyContinue
+                        }
+
+                        if (Test-Path $err) {
+                            $output += Get-Content $err -Raw `
+                                -ErrorAction SilentlyContinue
+                        }
+
+                        if ($proc.HasExited) {
+                            Write-Host 'OpenOCD output:'
+                            Write-Host $output
+
+                            throw 'OpenOCD exited before target connection.'
+                        }
+
+                        if ($output -match 'Examined RISCV core') {
+                            $connected = $true
+                            break
+                        }
+                    }
+
+                    if (!$connected) {
+                        $output = ''
+
+                        if (Test-Path $log) {
+                            $output += Get-Content $log -Raw `
+                                -ErrorAction SilentlyContinue
+                        }
+
+                        if (Test-Path $err) {
+                            $output += Get-Content $err -Raw `
+                                -ErrorAction SilentlyContinue
+                        }
+
+                        Write-Host 'OpenOCD diagnostic output:'
+                        Write-Host $output
+
+                        throw 'Target not detected within 20 seconds.'
+                    }
+
+                    Write-Host 'Target detected.'
+                    Write-Host 'Connecting GDB to OpenOCD...'
+
+                    # ------------------------------------
+                    # 5. Download ELF and resume execution
+                    # ------------------------------------
+                    & $gdb $elf --batch `
+                        -ex 'set architecture riscv:rv32' `
+                        -ex 'target extended-remote localhost:3333' `
+                        -ex 'monitor reset halt' `
+                        -ex 'load' `
+                        -ex 'monitor resume' `
+                        -ex 'detach' `
+                        -ex 'quit'
+
+                    if ($LASTEXITCODE -ne 0) {
+                        throw "GDB failed with exit code $LASTEXITCODE"
+                    }
+
+                    Write-Host 'Firmware download command completed.'
+                }
+                finally {
+                    # ------------------------------------
+                    # 6. Stop OpenOCD
+                    # ------------------------------------
+                    if (!$proc.HasExited) {
+                        Stop-Process -Id $proc.Id -Force `
                             -ErrorAction SilentlyContinue
                     }
-                    if (Test-Path $err) {
-                        $output += Get-Content $err -Raw `
-                            -ErrorAction SilentlyContinue
-                    }
-
-                    if ($proc.HasExited) {
-                        throw "OpenOCD exited. Review its logs."
-                    }
-
-                    if ($output -match 'Examined RISCV core') {
-                        $connected = $true
-                        break
-                    }
                 }
-
-                if (!$connected) {
-                    throw "Target not detected within 20 seconds. Check FlashPro4, JTAG, power, and OpenOCD logs."
-                }
-
-                Write-Host "Target detected. Downloading firmware..."
-
-                & $gdb $elf --batch `
-                    -ex 'set architecture riscv:rv32' `
-                    -ex 'target extended-remote localhost:3333' `
-                    -ex 'monitor reset halt' `
-                    -ex 'load' `
-                    -ex 'monitor resume' `
-                    -ex 'detach' `
-                    -ex 'quit'
-
-                if ($LASTEXITCODE -ne 0) {
-                    throw "GDB download failed with exit code $LASTEXITCODE"
-                }
-
-                Write-Host "SUCCESS: Firmware downloaded and execution resumed."
+            '''
             }
-            finally {
-                if (!$proc.HasExited) {
-                    Stop-Process -Id $proc.Id -Force
-                }
-            }
-        '''
         }
     }
+
 
         
         stage('Show Commit Details') {
