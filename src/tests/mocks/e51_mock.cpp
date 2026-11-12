@@ -32,7 +32,7 @@ void MSS_UART_init(mss_uart_instance_t* uart, uint32_t baud, uint32_t config)
     e51_mock_state.uart_baud = baud;
     e51_mock_state.uart_config = config;
 }
-###
+
 void MSS_UART_polled_tx_string(mss_uart_instance_t* uart, const uint8_t* string)
 {
     e51_mock_state.uart_tx_calls++;
